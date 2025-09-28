@@ -137,6 +137,7 @@ endif
 
 ifeq ($(PLATFORM),emscripten)
 STATIC_LDFLAGS = -lm -ldl
+STATICFLAGS = -DSEXP_USE_DL=0
 endif
 
 ifeq ($(PLATFORM),unix)

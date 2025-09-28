@@ -131,7 +131,9 @@ static sexp sexp_pid_cmdline (sexp ctx, int pid) {
 /*     return sexp_c_string(ctx, cmdline, -1); */
 /*   } */
 /* } */
-
+static sexp sexp_pid_cmdline (sexp ctx, int pid) {
+  return SEXP_FALSE;
+}
 #endif
 
 static pid_t sexp_fork_and_kill_threads (sexp ctx) {

@@ -1,0 +1,5 @@
+(cond-expand
+  (emscripten
+    (c-system-include "emscripten.h")
+
+    (define-c void (say-hello "printf") (string))))

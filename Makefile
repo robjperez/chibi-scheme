@@ -41,7 +41,7 @@ COMPILED_LIBS = $(CHIBI_COMPILED_LIBS) $(CHIBI_IO_COMPILED_LIBS) \
 	lib/srfi/27/rand$(SO) lib/srfi/151/bit$(SO) \
 	lib/srfi/39/param$(SO) lib/srfi/69/hash$(SO) lib/srfi/95/qsort$(SO) \
 	lib/srfi/98/env$(SO) lib/srfi/144/math$(SO) lib/srfi/160/uvprims$(SO) \
-	lib/scheme/bytevector$(SO) lib/scheme/time$(SO)
+	lib/scheme/bytevector$(SO) lib/scheme/time$(SO) lib/robj/gameengine$(SO)
 
 BASE_INCLUDES = include/chibi/sexp.h include/chibi/features.h include/chibi/install.h include/chibi/bignum.h
 INCLUDES = $(BASE_INCLUDES) include/chibi/eval.h include/chibi/gc_heap.h
@@ -80,7 +80,7 @@ js: js/chibi.js
 js/chibi.js: chibi-scheme-emscripten chibi-scheme-static.bc js/pre.js js/post.js js/exported_functions.json
 	PRELOAD_FLAGS=$$(find lib -type f \( -name "*.scm" -o -name "*.sld" \) \
 		-exec printf ' --preload-file %s' {} \;) ; \
-	emcc -O0 main.o $(SEXP_OBJS) $(EVAL_OBJS) -o $@ -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_NAME=\"Chibi\" -s EXPORTED_FUNCTIONS=@js/exported_functions.json $$PRELOAD_FLAGS -s 'EXPORTED_RUNTIME_METHODS=["ccall", "cwrap"]' --pre-js js/pre.js --post-js js/post.js
+	emcc -O0 main.o $(SEXP_OBJS) $(EVAL_OBJS) -o $@ -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_NAME=\"Chibi\" -s EXPORTED_FUNCTIONS=@js/exported_functions.json $$PRELOAD_FLAGS -s 'EXPORTED_RUNTIME_METHODS=["ccall", "cwrap"]' -sUSE_SDL=2 --pre-js js/pre.js --post-js js/post.js -g -g3 -gsource-map 
 
 chibi-scheme-static.bc:
 	emmake $(MAKE) PLATFORM=emscripten CHIBI_DEPENDENCIES= CHIBI=./chibi-scheme-emscripten PREFIX= CFLAGS=-O2 SEXP_USE_DL=0 EXE=.bc SO=.bc STATICFLAGS=-shared CPPFLAGS="-DSEXP_USE_STRICT_TOPLEVEL_BINDINGS=1 -DSEXP_USE_ALIGNED_BYTECODE=1 -DSEXP_USE_STATIC_LIBS=1 -DSEXP_USE_STATIC_LIBS_NO_INCLUDE=0" clibs.c chibi-scheme-static.bc VERBOSE=1
@@ -150,11 +150,7 @@ chibi-scheme-ulimit$(EXE): main.o $(SEXP_ULIMIT_OBJS) $(EVAL_OBJS)
 	$(CC) $(XCFLAGS) $(STATICFLAGS) -o $@ $^ $(LDFLAGS) $(GCLDFLAGS) $(STATIC_LDFLAGS)
 
 clibs.c: $(GENSTATIC) $(CHIBI_DEPENDENCIES) $(COMPILED_LIBS:%$(SO)=%.c)
-	if [ -d .git ]; then \
-		$(GIT) ls-files lib | $(GREP) .sld | $(CHIBI) -q $(GENSTATIC) > $@; \
-	else \
-		$(FIND) lib -name \*.sld | $(CHIBI) -q $(GENSTATIC) > $@; \
-	fi
+	$(FIND) lib -name \*.sld | $(CHIBI) -q $(GENSTATIC) > $@;
 
 chibi-scheme.pc: chibi-scheme.pc.in
 	echo "# pkg-config" > chibi-scheme.pc

@@ -34,6 +34,13 @@
         overflow: auto;
         flex: 1 1 0;
       }
+      /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
+      canvas {
+          border: 0px none;
+          background-color: black;
+          width: 800px;
+          height: 600px;
+        }
     </style>
   </head>
   <body>
@@ -67,6 +74,7 @@
 </textarea>
       <button type="button" id="start" disabled>Start Program</button>
       <div id="output"></div>
+      <canvas id="canvas"></canvas>
     </main>
     <script src="chibi.js"></script>
     <script>
@@ -74,18 +82,20 @@
         var firstError = true;
         Chibi({
           print: onOutput,
-          printErr: function (text) {
-            if (firstError) {
-              firstError = false;
-              return;
-            }
-            if (onError !== undefined) {
-              onError(text);
-            } else {
-              onOutput(text);
-            }
-          },
-          program: program,
+          // printErr: function (text) {
+          //   if (firstError) {
+          //     firstError = false;
+          //     return;
+          //   }
+          //   if (onError !== undefined) {
+          //     onError(text);
+          //   } else {
+          //     onOutput(text);
+          //   }
+          // },
+          printErr: onOutput,
+          canvas: document.getElementById('canvas'), // Don't forget to pass the canvas here
+          program: program, // chibi.js glue code writes this to program.scm and that is what the main.c loads
           arguments: args
         });
       }
@@ -103,9 +113,10 @@
         });
         startButton.addEventListener('click', function() {
           var program = programField.value;
-          startButton.disabled = true;
+          //startButton.disabled = true;
           start(program, [],
-              function(text) {
+                function(text) {
+                  console.log(text);
                 output.textContent = output.textContent + text + '\n'
               });
         });

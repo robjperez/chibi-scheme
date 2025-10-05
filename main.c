@@ -675,28 +675,233 @@ void sexp_resume() {
 }
 #endif
 
-int main (int argc, char **argv) {
+/* int main (int argc, char **argv) { */
+/*   sexp res; */
+/* #if SEXP_USE_PRINT_BACKTRACE_ON_SEGFAULT */
+/*   signal(SIGSEGV, sexp_segfault_handler);  */
+/* #endif */
+/*   sexp_scheme_init(); */
+/*   res = run_main(argc, argv); */
+/*   if (sexp_fixnump(res)) { */
+/*     int code = sexp_unbox_fixnum(res); */
+/* #ifdef PLAN9 */
+/*     if (code == 0) { */
+/*       exit_success(); */
+/*     } else { */
+/*       exit_failure(); */
+/*     } */
+/* #else */
+/*     return code; */
+/* #endif */
+/*   } else if (res == SEXP_FALSE) { */
+/*     exit_failure(); */
+/*   } else { */
+/*     exit_success(); */
+/*   } */
+/*   return 0; */
+/* } */
+
+/* #include <SDL2/SDL.h> */
+/* #include <math.h> */
+/* #include <stdio.h> */
+
+/* #define SCREEN_WIDTH 800 */
+/* #define SCREEN_HEIGHT 600 */
+
+/* typedef struct { */
+/*     SDL_Window* window; */
+/*     SDL_Renderer* renderer; */
+/*     float angle; */
+/* } Context; */
+
+/* void drawTriangle(SDL_Renderer* renderer, float cx, float cy, float radius, float angle) { */
+/*     SDL_Point points[4]; */
+    
+/*     for (int i = 0; i < 3; i++) { */
+/*         float currentAngle = angle + (i * 2.0f * M_PI / 3.0f); */
+/*         points[i].x = (int)(cx + radius * cosf(currentAngle)); */
+/*         points[i].y = (int)(cy + radius * sinf(currentAngle)); */
+/*     } */
+    
+/*     points[3] = points[0]; */
+    
+/*     SDL_SetRenderDrawColor(renderer, 255, 100, 100, 255); */
+/*     SDL_RenderDrawLines(renderer, points, 4); */
+/* } */
+
+/* void mainLoop(void* arg) { */
+/*     Context* ctx = (Context*)arg; */
+    
+/*     SDL_Event event; */
+/*     while (SDL_PollEvent(&event)) { */
+/*         if (event.type == SDL_QUIT) { */
+/*             emscripten_cancel_main_loop(); */
+/*         } */
+/*     } */
+    
+/*     SDL_SetRenderDrawColor(ctx->renderer, 20, 20, 40, 255); */
+/*     SDL_RenderClear(ctx->renderer); */
+    
+/*     drawTriangle(ctx->renderer, */
+/*                  SCREEN_WIDTH / 2.0f, */
+/*                  SCREEN_HEIGHT / 2.0f, */
+/*                  150.0f, */
+/*                  ctx->angle); */
+    
+/*     ctx->angle += 0.02f; */
+/*     if (ctx->angle > 2.0f * M_PI) { */
+/*         ctx->angle -= 2.0f * M_PI; */
+/*     } */
+    
+/*     SDL_RenderPresent(ctx->renderer); */
+/* } */
+
+/* int main(int argc, char* argv[]) { */
+/*     // Scheme init */
+/*     sexp_scheme_init(); */
+
+/*     // Init SDL */
+/*     if (SDL_Init(SDL_INIT_VIDEO) < 0) { */
+/*         printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError()); */
+/*         return 1; */
+/*     } */
+    
+/*     Context ctx; */
+/*     ctx.angle = 0.0f; */
+/*     SDL_CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, 0, &ctx.window, &ctx.renderer); */
+    
+/*     if (!ctx.window) { */
+/*         printf("Window could not be created! SDL_Error: %s\n", SDL_GetError()); */
+/*         SDL_Quit(); */
+/*         return 1; */
+/*     } */
+    
+/*     if (!ctx.renderer) { */
+/*         printf("Renderer could not be created! SDL_Error: %s\n", SDL_GetError()); */
+/*         SDL_DestroyWindow(ctx.window); */
+/*         SDL_Quit(); */
+/*         return 1; */
+/*     } */
+    
+/*     emscripten_set_main_loop_arg(mainLoop, &ctx, 0, 1); */
+    
+/*     SDL_DestroyRenderer(ctx.renderer); */
+/*     SDL_DestroyWindow(ctx.window); */
+/*     SDL_Quit(); */
+    
+/*     return 0; */
+/* } */
+
+/* simplified main.c
+ *
+ * Expects argv[1] == "program.scm" (the JS glue writes this file before main()).
+ * The Scheme program must define:
+ *   (define (initialize) ...)
+ *   (define (update) ...)
+ *   (define (render) ...)
+ *
+ * Build with your chibi-scheme includes/libs and emscripten.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <emscripten.h>
+#include "chibi/eval.h"
+
+typedef struct {
+  sexp ctx;
+  sexp env;
+  sexp update_proc;
+  sexp render_proc;
+} app_state_t;
+
+/* main loop called by emscripten_set_main_loop_arg */
+static void main_loop(void *arg) {
+  app_state_t *st = (app_state_t*)arg;
+  sexp ctx = st->ctx;
   sexp res;
-#if SEXP_USE_PRINT_BACKTRACE_ON_SEGFAULT
-  signal(SIGSEGV, sexp_segfault_handler); 
-#endif
-  sexp_scheme_init();
-  res = run_main(argc, argv);
-  if (sexp_fixnump(res)) {
-    int code = sexp_unbox_fixnum(res);
-#ifdef PLAN9
-    if (code == 0) {
-      exit_success();
-    } else {
-      exit_failure();
-    }
-#else
-    return code;
-#endif
-  } else if (res == SEXP_FALSE) {
-    exit_failure();
-  } else {
-    exit_success();
+
+  /* Call (update) */
+  res = sexp_apply(ctx, st->update_proc, SEXP_NULL);
+  if (res && sexp_exceptionp(res)) {
+    sexp_print_exception(ctx, res, sexp_current_error_port(ctx));
+    /* you might want to stop the loop here or handle it differently */
   }
+
+  /* Call (render) */
+  res = sexp_apply(ctx, st->render_proc, SEXP_NULL);
+  if (res && sexp_exceptionp(res)) {
+    sexp_print_exception(ctx, res, sexp_current_error_port(ctx));
+  }
+}
+
+int main(int argc, char **argv) {
+
+  //sexp_scheme_init();
+   
+  /* Declare local sexp variables for GC machinery */
+  sexp_gc_var7(ctx, env, res, init_proc, update_proc, render_proc, fname);
+
+
+  /* initialize chibi */
+  sexp_init();
+  ctx = sexp_make_eval_context(NULL, NULL, NULL, 0, 0);
+  if (!ctx) {
+    fprintf(stderr, "chibi: out of memory\n");
+    return 1;
+  }
+
+  /* --- Chibi standard initialization --- */
+  env = sexp_load_standard_env(ctx, NULL, SEXP_SEVEN);
+  sexp_load_standard_ports(ctx, env, stdin, stdout, stderr, 0);
+  setvbuf(stdout, NULL, _IONBF, 0);
+  sexp_load_standard_params(ctx, env, 0);
+  if (sexp_exceptionp(env)) {
+    sexp_print_exception(ctx, env, sexp_current_error_port(ctx));
+    return 1;
+  }
+  
+  fname = sexp_c_string(ctx, argv[1], -1);
+  res = sexp_load(ctx, fname, env);
+  if (sexp_exceptionp(res)) {
+    sexp_print_exception(ctx, res, sexp_current_error_port(ctx));
+    return 1;
+  }
+
+  /* look up initialize, update, render */
+  init_proc   = sexp_env_ref(ctx, env, sexp_intern(ctx, "initialize", -1), SEXP_FALSE);
+  update_proc = sexp_env_ref(ctx, env, sexp_intern(ctx, "update", -1), SEXP_FALSE);
+  render_proc = sexp_env_ref(ctx, env, sexp_intern(ctx, "render", -1), SEXP_FALSE);
+
+  if (!sexp_procedurep(init_proc) || !sexp_procedurep(update_proc) || !sexp_procedurep(render_proc)) {
+    fprintf(stderr, "program must define (initialize), (update) and (render)\n");
+    return 1;
+  }
+
+  /* Call (initialize) once */
+  res = sexp_apply(ctx, init_proc, SEXP_NULL);
+  if (res && sexp_exceptionp(res)) {
+    sexp_print_exception(ctx, res, sexp_current_error_port(ctx));
+    return 1;
+  }
+
+  /* Preserve the procs across GC (they will not be reclaimed). */
+  sexp_preserve_object(ctx, update_proc);
+  sexp_preserve_object(ctx, render_proc);
+
+  /* Allocate state for the main loop and start it */
+  app_state_t *state = (app_state_t*)malloc(sizeof(app_state_t));
+  if (!state) {
+    fprintf(stderr, "out of memory (state)\n");
+    /* release preserved objects if desired: sexp_release_object(ctx, update_proc); ... */
+    return 1;
+  }
+  state->ctx = ctx;
+  state->env = env;
+  state->update_proc = update_proc;
+  state->render_proc = render_proc;
+
+  emscripten_set_main_loop_arg(main_loop, state, 0, 1);
+
   return 0;
 }

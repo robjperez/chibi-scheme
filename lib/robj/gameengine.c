@@ -5,22 +5,57 @@
 // $ find lib/ -name "gameengine.sld" | ./chibi-scheme-emscripten -q ./tools/chibi-genstatic
 
 #include <chibi/eval.h>
-
+#include "state.h"
+#include <SDL2/SDL.h>
+#include <math.h>
 #include <emscripten.h>
 /*
 types: ()
 enums: ()
 */
 
-void hello_world() {
-  printf("SDL, Here we go!\n");
+sexp sexp_clear_screen_stub (sexp ctx, sexp self, sexp_sint_t n, sexp arg0) {
+  if (! sexp_stringp(arg0))
+    return sexp_type_exception(ctx, self, SEXP_STRING, arg0);  
+  return SEXP_VOID;
 }
 
-sexp sexp_say_hello_stub (sexp ctx, sexp self, sexp_sint_t n, sexp arg0) {
-  if (! sexp_stringp(arg0))
-    return sexp_type_exception(ctx, self, SEXP_STRING, arg0);
-  printf("Hello %s\n", sexp_string_data(arg0));
-  hello_world();
+
+sexp sexp_draw_lines_stub (sexp ctx, sexp self, sexp_sint_t n, sexp arg0) {
+  if (! sexp_listp(ctx, arg0))
+    return sexp_type_exception(ctx, self, SEXP_LIT, arg0);
+
+  int arg_len = sexp_unbox_fixnum(sexp_length(ctx, arg0));
+  //printf("arg len: %d\n", arg_len);
+  // TODO CHECK MAX LEN and throw error
+  SDL_Point* points = (SDL_Point*)malloc(sizeof(SDL_Point) * arg_len);
+  sexp item = sexp_car(arg0);
+  sexp next = sexp_cdr(arg0);
+  for (int i = 1; i <= arg_len; i++) {
+    points[i-1].x = sexp_flonum_value(sexp_car(item));
+    points[i-1].y = sexp_flonum_value(sexp_car(sexp_cdr(item)));
+    //printf("Point: %d, %d\n", points[i-1].x, points[i-1].y);
+    item = sexp_car(next);
+    next = sexp_cdr(next);
+  }
+  SDL_Renderer* renderer = global_state->sdl_ctx.renderer;
+  /* float angle = 0.0f; */
+  /* float cx = 400; */
+  /* float cy = 300; */
+  /* float radius = 150.0f; */
+  /* SDL_Point points[4]; */
+
+  /* for (int i = 0; i < 3; i++) { */
+  /*   float currentAngle = angle + (i * 2.0f * M_PI / 3.0f); */
+  /*   points[i].x = (int)(cx + radius * cosf(currentAngle)); */
+  /*   points[i].y = (int)(cy + radius * sinf(currentAngle)); */
+  /* } */
+  
+  /* points[3] = points[0]; */
+
+  SDL_SetRenderDrawColor(renderer, 255, 100, 100, 255);
+  SDL_RenderDrawLines(renderer, points, arg_len);
+  free(points);
   return SEXP_VOID;
 }
 
@@ -31,11 +66,18 @@ sexp sexp_init_library (sexp ctx, sexp self, sexp_sint_t n, sexp env, const char
         && sexp_abi_compatible(ctx, abi, SEXP_ABI_IDENTIFIER)))
     return SEXP_ABI_ERROR;
   sexp_gc_preserve3(ctx, name, tmp, op);
-  op = sexp_define_foreign(ctx, env, "say-hello", 1, sexp_say_hello_stub);
+  op = sexp_define_foreign(ctx, env, "clear-screen!", 1, sexp_clear_screen_stub);
   if (sexp_opcodep(op)) {
     sexp_opcode_return_type(op) = SEXP_VOID;
     sexp_opcode_arg1_type(op) = sexp_make_fixnum(SEXP_STRING);
   }
+
+  op = sexp_define_foreign(ctx, env, "draw-lines!", 1, sexp_draw_lines_stub);
+  if (sexp_opcodep(op)) {
+    sexp_opcode_return_type(op) = SEXP_VOID;
+    sexp_opcode_arg1_type(op) = sexp_make_fixnum(SEXP_LIT);
+  }
+  
   sexp_gc_release3(ctx);
   return SEXP_VOID;
 }

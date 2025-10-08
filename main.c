@@ -807,13 +807,12 @@ void sexp_resume() {
 #include <stdlib.h>
 #include <emscripten.h>
 #include "chibi/eval.h"
+#include "state.h"
+#include <SDL2/SDL.h>
+#include <math.h>
 
-typedef struct {
-  sexp ctx;
-  sexp env;
-  sexp update_proc;
-  sexp render_proc;
-} app_state_t;
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 600
 
 /* main loop called by emscripten_set_main_loop_arg */
 static void main_loop(void *arg) {
@@ -828,17 +827,58 @@ static void main_loop(void *arg) {
     /* you might want to stop the loop here or handle it differently */
   }
 
+  SDL_Renderer* renderer = st->sdl_ctx.renderer;
+  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
+  SDL_RenderClear(renderer);
+  
   /* Call (render) */
   res = sexp_apply(ctx, st->render_proc, SEXP_NULL);
   if (res && sexp_exceptionp(res)) {
     sexp_print_exception(ctx, res, sexp_current_error_port(ctx));
   }
+
+  SDL_RenderPresent(renderer);
 }
 
+void init_sdl(app_state_t* st) {
+  SDLContext* ctx = &st->sdl_ctx;
+  // Init SDL */
+  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+    /* return 1; */
+  }
+  
+  SDL_CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, 0, &ctx->window, &ctx->renderer);
+  
+  if (!ctx->window) {
+    printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
+    SDL_Quit();
+    /* return 1; */
+  }
+  
+  if (!ctx->renderer) {
+    printf("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
+    SDL_DestroyWindow(ctx->window);
+    SDL_Quit();
+    /* return 1; */
+  }
+}
+
+void init_engine(app_state_t* st) {
+  // Init SDL Engine
+  init_sdl(st);
+  // Now call scheme initialize
+  sexp res = sexp_apply(st->ctx, st->init_proc, SEXP_NULL);
+  if (res && sexp_exceptionp(res)) {
+    sexp_print_exception(st->ctx, res, sexp_current_error_port(st->ctx));
+    /* return 1; */
+  }
+}
+
+app_state_t* global_state = NULL;
 int main(int argc, char **argv) {
 
   //sexp_scheme_init();
-   
   /* Declare local sexp variables for GC machinery */
   sexp_gc_var7(ctx, env, res, init_proc, update_proc, render_proc, fname);
 
@@ -878,17 +918,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  /* Call (initialize) once */
-  res = sexp_apply(ctx, init_proc, SEXP_NULL);
-  if (res && sexp_exceptionp(res)) {
-    sexp_print_exception(ctx, res, sexp_current_error_port(ctx));
-    return 1;
-  }
-
-  /* Preserve the procs across GC (they will not be reclaimed). */
-  sexp_preserve_object(ctx, update_proc);
-  sexp_preserve_object(ctx, render_proc);
-
   /* Allocate state for the main loop and start it */
   app_state_t *state = (app_state_t*)malloc(sizeof(app_state_t));
   if (!state) {
@@ -898,8 +927,18 @@ int main(int argc, char **argv) {
   }
   state->ctx = ctx;
   state->env = env;
+  state->init_proc = init_proc;
   state->update_proc = update_proc;
   state->render_proc = render_proc;
+
+  init_engine(state);
+
+  /* Preserve the procs across GC (they will not be reclaimed). */
+  sexp_preserve_object(ctx, init_proc);
+  sexp_preserve_object(ctx, update_proc);
+  sexp_preserve_object(ctx, render_proc);
+
+  global_state = state;
 
   emscripten_set_main_loop_arg(main_loop, state, 0, 1);
 

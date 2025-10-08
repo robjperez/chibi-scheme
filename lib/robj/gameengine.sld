@@ -2,6 +2,6 @@
   (cond-expand
    (emscripten
     (import (chibi) (chibi ast))
-    (export hello-world say-hello)
+    (export clear-screen! draw-lines!)
     (include "gameengine.scm")
     (include-shared "gameengine"))))

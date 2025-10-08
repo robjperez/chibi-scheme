@@ -3,99 +3,217 @@
   <head>
     <meta charset="utf-8">
     <title>Chibi-Scheme</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+      
       body {
-        font-family: sans-serif;
+        font-family: 'JetBrains Mono', monospace;
         height: 100vh;
         margin: 0;
         padding: 0;
+        background-color: #1a1a1a;
+        color: #ffffff;
+        overflow: hidden;
+      }
+      
+      .container {
+        height: 100vh;
+        display: grid;
+        grid-template-columns: 1fr 800px;
+        grid-template-rows: 1fr 15%;
+        grid-template-areas: 
+          "editor canvas"
+          "output output";
+        gap: 0;
+      }
+      
+      .editor-section {
+        grid-area: editor;
         display: flex;
         flex-direction: column;
+        background-color: #2d2d2d;
+        border-right: 2px solid #444;
       }
-      main {
+      
+      .editor-header {
+        padding: 10px 15px;
+        background-color: #3d3d3d;
+        border-bottom: 1px solid #444;
+        font-weight: 500;
+        font-size: 14px;
+        position: relative;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .editor-container {
         flex: 1;
+        position: relative;
+      }
+      
+      #program {
+        width: 100%;
+        height: 100%;
+        border: none;
+        outline: none;
+        background-color: #2d2d2d;
+        color: #ffffff;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        padding: 15px;
+        resize: none;
+        box-sizing: border-box;
+      }
+      
+      .canvas-section {
+        grid-area: canvas;
+        position: relative;
+        background-color: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      canvas {
+        border: 0px none;
+        background-color: black;
+        width: 800px;
+        height: 600px;
+        display: block;
+      }
+      
+      .scheme-logo {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 24px;
+        font-weight: 700;
+        color: #4CAF50;
+        opacity: 0.3;
+        pointer-events: none;
+        z-index: 1;
+      }
+      
+      .output-section {
+        grid-area: output;
+        background-color: #1a1a1a;
+        border-top: 2px solid #444;
         display: flex;
         flex-direction: column;
       }
-      #program {
-        flex: 1 1 0;
-        padding: 0.5em;
+      
+      .output-header {
+        padding: 8px 15px;
+        background-color: #3d3d3d;
+        border-bottom: 1px solid #444;
+        font-weight: 500;
+        font-size: 12px;
+        color: #888;
       }
-      #start {
-        font-size: inherit;
-        padding: 0.5em;
-      }
+      
       #output {
-        font-family: monospace;
-        padding: 0.5em;
+        flex: 1;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        padding: 10px 15px;
         white-space: pre;
-        background-color: #000;
-        color: #fff;
+        background-color: #1a1a1a;
+        color: #ffffff;
         overflow: auto;
-        flex: 1 1 0;
+        border: none;
+        outline: none;
+        resize: none;
       }
-      /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
-      canvas {
-          border: 0px none;
-          background-color: black;
-          width: 800px;
-          height: 600px;
-        }
+      
+      #start {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        font-weight: 500;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        margin-left: auto;
+      }
+      
+      #start:hover {
+        background-color: #45a049;
+      }
+      
+      #start:disabled {
+        background-color: #666;
+        cursor: not-allowed;
+      }
+      
+      /* CodeMirror custom styling */
+      .CodeMirror {
+        height: 100%;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      
+      .CodeMirror-gutters {
+        background-color: #2d2d2d;
+        border-right: 1px solid #444;
+      }
+      
+      .CodeMirror-linenumber {
+        color: #888;
+      }
     </style>
   </head>
   <body>
-    <main>
-      <textarea id="program" spellcheck="false">;
-; This is Chibi-Scheme compiled with Emscripten to run in the browser.
-;
+    <div class="container">
+      <div class="editor-section">
+        <div class="editor-header">
+          Scheme Editor
+          <button type="button" id="start" disabled>Start Program</button>
+        </div>
+        <div class="editor-container">
+          <textarea id="program" spellcheck="false">
+(import (scheme base) (robj gameengine))
 
-(import (scheme base))
-(write-string "Hello, world!\n")
+(define (initialize)
+  (write-string "Init\n") (newline))
 
-;
-; You can also run arbitrary JavaScript code from scheme and yield control back and forth between Scheme and the browser
-;
+(define (update) (newline))
 
-(import (chibi emscripten)) ; exports: eval-script!, integer-eval-script, string-eval-script, wait-on-event!
-
-(write-string (number->string (integer-eval-script "6 * 7")))
-(newline)
-
-(eval-script! "window.addEventListener('click', function () {
-  Module['resume'](); // give control back to the Scheme process
-})")
-
-(let loop ()
-  (wait-on-event!) ; yields control back to the browser
-  (write-string "You have clicked me!\n")
-  (loop))
-
-(write-string "Control never reaches this point\n")
-</textarea>
-      <button type="button" id="start" disabled>Start Program</button>
-      <div id="output"></div>
-      <canvas id="canvas"></canvas>
-    </main>
+(define (render)
+  (draw-lines! "Hola"))
+          </textarea>
+        </div>
+      </div>
+      
+      <div class="canvas-section">
+        <canvas id="canvas"></canvas>
+        <div class="scheme-logo">λ</div>
+      </div>
+      
+      <div class="output-section">
+        <div class="output-header">Output</div>
+        <div id="output"></div>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/scheme/scheme.min.js"></script>
     <script src="chibi.js"></script>
     <script>
       function start(program, args, onOutput, onError) {
         var firstError = true;
         Chibi({
           print: onOutput,
-          // printErr: function (text) {
-          //   if (firstError) {
-          //     firstError = false;
-          //     return;
-          //   }
-          //   if (onError !== undefined) {
-          //     onError(text);
-          //   } else {
-          //     onOutput(text);
-          //   }
-          // },
           printErr: onOutput,
-          canvas: document.getElementById('canvas'), // Don't forget to pass the canvas here
-          program: program, // chibi.js glue code writes this to program.scm and that is what the main.c loads
+          canvas: document.getElementById('canvas'),
+          program: program,
           arguments: args
         });
       }
@@ -104,22 +222,44 @@
       (function () {
         var programField = document.querySelector('#program');
         var startButton = document.querySelector('#start');
+        var output = document.querySelector('#output');
+        
+        // Initialize CodeMirror for syntax highlighting
+        var editor = CodeMirror.fromTextArea(programField, {
+          mode: 'scheme',
+          theme: 'monokai',
+          lineNumbers: true,
+          indentUnit: 2,
+          smartIndent: true,
+          electricChars: true,
+          matchBrackets: true,
+          autoCloseBrackets: true,
+          styleActiveLine: true,
+          lineWrapping: false,
+          foldGutter: true,
+          gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"]
+        });
+        
+        // Load saved program
         var program = sessionStorage.getItem('program');
         if (program) {
-          programField.value = program;
+          editor.setValue(program);
         }
-        programField.addEventListener('input', function() {
-          sessionStorage.setItem('program', programField.value);
+        
+        // Save program on change
+        editor.on('change', function() {
+          sessionStorage.setItem('program', editor.getValue());
         });
+        
         startButton.addEventListener('click', function() {
-          var program = programField.value;
-          //startButton.disabled = true;
+          var program = editor.getValue();
           start(program, [],
                 function(text) {
                   console.log(text);
-                output.textContent = output.textContent + text + '\n'
-              });
+                  output.textContent = output.textContent + text + '\n';
+                });
         });
+        
         startButton.disabled = false;
       })();
     </script>
